@@ -16,6 +16,7 @@ import dan200.computercraft.shared.peripheral.speaker.TileSpeaker;
 import dan200.computercraft.shared.util.DirectionUtil;
 import net.minecraft.block.properties.PropertyDirection;
 import net.minecraft.block.properties.PropertyEnum;
+import net.minecraft.block.state.BlockFaceShape;
 import net.minecraft.block.state.BlockStateContainer;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.entity.EntityLivingBase;
@@ -51,6 +52,7 @@ public class BlockPeripheral extends BlockPeripheralBase
         );
     }
 
+    @Override
     @Nonnull
     @SideOnly( Side.CLIENT)
     public BlockRenderLayer getBlockLayer()
@@ -554,13 +556,13 @@ public class BlockPeripheral extends BlockPeripheralBase
     }
 
     @Override
-    public void onBlockPlacedBy( World world, BlockPos pos, IBlockState state, EntityLivingBase player, ItemStack stack )
+    public void onBlockPlacedBy( World world, BlockPos pos, IBlockState state, EntityLivingBase player, @Nonnull ItemStack stack )
     {
         // Not sure why this is necessary
         TileEntity tile = world.getTileEntity( pos );
         if( tile != null && tile instanceof TilePeripheralBase )
         {
-            tile.setWorldObj( world ); // Not sure why this is necessary
+            tile.setWorld( world ); // Not sure why this is necessary
             tile.setPos( pos ); // Not sure why this is necessary
         }
 
@@ -610,5 +612,30 @@ public class BlockPeripheral extends BlockPeripheralBase
                 break;
             }
         }
+    }
+
+    @Override
+    @Deprecated
+    public final boolean isOpaqueCube( IBlockState state )
+    {
+        PeripheralType type = getPeripheralType( state );
+        return type == PeripheralType.DiskDrive || type == PeripheralType.Printer
+            || type == PeripheralType.Monitor || type == PeripheralType.AdvancedMonitor
+            || type == PeripheralType.Speaker;
+    }
+
+    @Override
+    @Deprecated
+    public final boolean isFullCube( IBlockState state )
+    {
+        return isOpaqueCube( state );
+    }
+
+    @Nonnull
+    @Override
+    @Deprecated
+    public BlockFaceShape getBlockFaceShape( IBlockAccess world, IBlockState state, BlockPos pos, EnumFacing side )
+    {
+        return isOpaqueCube( state ) ? BlockFaceShape.SOLID : BlockFaceShape.UNDEFINED;
     }
 }

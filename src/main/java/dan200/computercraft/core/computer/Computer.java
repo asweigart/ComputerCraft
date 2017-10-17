@@ -224,7 +224,7 @@ public class Computer
         m_fileSystem = null;
 
         m_machine = null;
-        m_apis = new ArrayList<ILuaAPI>();
+        m_apis = new ArrayList<>();
         m_apiEnvironment = new APIEnvironment( this );
 
         m_internalOutput = new int[6];
@@ -635,7 +635,7 @@ public class Computer
         InputStream biosStream;
         try
         {
-            biosStream = Computer.class.getResourceAsStream( "/assets/computercraft/lua/bios.lua" );
+            biosStream = m_environment.createResourceFile( "computercraft", "lua/bios.lua" );
         }
         catch( Exception e )
         {

@@ -58,6 +58,7 @@ import net.minecraft.network.PacketBuffer;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.EnumHand;
+import net.minecraft.util.NonNullList;
 import net.minecraft.util.SoundEvent;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
@@ -72,10 +73,11 @@ import net.minecraftforge.fml.common.network.FMLEventChannel;
 import net.minecraftforge.fml.common.network.NetworkRegistry;
 import net.minecraftforge.fml.common.network.internal.FMLProxyPacket;
 import net.minecraftforge.fml.relauncher.Side;
+import org.apache.commons.io.IOUtils;
 import org.apache.logging.log4j.Logger;
 
-import java.io.File;
-import java.io.IOException;
+import javax.annotation.Nonnull;
+import java.io.*;
 import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.net.URL;
@@ -83,6 +85,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 
 ///////////////
 // UNIVERSAL //
@@ -94,7 +98,7 @@ import java.util.Map;
 )
 public class ComputerCraft
 {
-    public static final String MOD_ID = "ComputerCraft";
+    public static final String MOD_ID = "computercraft";
     public static final String LOWER_ID = "computercraft";
 
     // GUI IDs
@@ -235,11 +239,11 @@ public class ComputerCraft
     public static Logger log;
 
     // API users
-    private static List<IPeripheralProvider> peripheralProviders = new ArrayList<IPeripheralProvider>();
-    private static List<IBundledRedstoneProvider> bundledRedstoneProviders = new ArrayList<IBundledRedstoneProvider>();
-    private static List<IMediaProvider> mediaProviders = new ArrayList<IMediaProvider>();
-    private static List<ITurtlePermissionProvider> permissionProviders = new ArrayList<ITurtlePermissionProvider>();
-    private static final Map<String, IPocketUpgrade> pocketUpgrades = new HashMap<String, IPocketUpgrade>();
+    private static List<IPeripheralProvider> peripheralProviders = new ArrayList<>();
+    private static List<IBundledRedstoneProvider> bundledRedstoneProviders = new ArrayList<>();
+    private static List<IMediaProvider> mediaProviders = new ArrayList<>();
+    private static List<ITurtlePermissionProvider> permissionProviders = new ArrayList<>();
+    private static final Map<String, IPocketUpgrade> pocketUpgrades = new HashMap<>();
 
     // Implementation
     @Mod.Instance( value = ComputerCraft.MOD_ID )
@@ -362,6 +366,7 @@ public class ComputerCraft
         http_blacklist = new AddressPredicate( Config.http_blacklist.getStringList() );
         disable_lua51_features = Config.disable_lua51_features.getBoolean();
         default_computer_settings = Config.default_computer_settings.getString();
+        logPeripheralErrors = Config.logPeripheralErrors.getBoolean();
 
         enableCommandBlock = Config.enableCommandBlock.getBoolean();
 
@@ -390,14 +395,6 @@ public class ComputerCraft
     {
         proxy.init();
         turtleProxy.init();
-    }
-
-
-    @Mod.EventHandler
-    public void onMissingMappings( FMLMissingMappingsEvent event )
-    {
-        proxy.remap( event );
-        turtleProxy.remap( event );
     }
 
     @Mod.EventHandler
@@ -460,7 +457,7 @@ public class ComputerCraft
         proxy.playRecord( record, recordInfo, world, pos );
     }
 
-    public static String getRecordInfo( ItemStack recordStack )
+    public static String getRecordInfo( @Nonnull ItemStack recordStack )
     {
         return proxy.getRecordInfo( recordStack );
     }
@@ -712,9 +709,9 @@ public class ComputerCraft
         return combinedSignal;
     }
 
-    public static IMedia getMedia( ItemStack stack )
+    public static IMedia getMedia( @Nonnull ItemStack stack )
     {
-        if( stack != null )
+        if( !stack.isEmpty() )
         {
             // Try the handlers in order:
             for( IMediaProvider mediaProvider : mediaProviders )
@@ -742,14 +739,14 @@ public class ComputerCraft
         return pocketUpgrades.get( id );
     }
 
-    public static IPocketUpgrade getPocketUpgrade( ItemStack stack )
+    public static IPocketUpgrade getPocketUpgrade( @Nonnull ItemStack stack )
     {
-        if( stack == null ) return null;
+        if( stack.isEmpty() ) return null;
 
         for (IPocketUpgrade upgrade : pocketUpgrades.values())
         {
             ItemStack craftingStack = upgrade.getCraftingItem();
-            if( craftingStack != null && InventoryUtil.areItemsStackable( stack, craftingStack ) )
+            if( !craftingStack.isEmpty() && InventoryUtil.areItemsStackable( stack, craftingStack ) )
             {
                 return upgrade;
             }
@@ -759,7 +756,7 @@ public class ComputerCraft
     }
 
     public static Iterable<IPocketUpgrade> getVanillaPocketUpgrades() {
-        List<IPocketUpgrade> upgrades = new ArrayList<IPocketUpgrade>();
+        List<IPocketUpgrade> upgrades = new ArrayList<>();
         for(IPocketUpgrade upgrade : pocketUpgrades.values()) {
             if(upgrade instanceof PocketModem || upgrade instanceof PocketSpeaker) {
                 upgrades.add( upgrade );
@@ -794,7 +791,7 @@ public class ComputerCraft
     public static IMount createResourceMount( Class<?> modClass, String domain, String subPath )
     {
         // Start building list of mounts
-        List<IMount> mounts = new ArrayList<IMount>();
+        List<IMount> mounts = new ArrayList<>();
         subPath = "assets/" + domain + "/" + subPath;
 
         // Mount from debug dir
@@ -875,6 +872,88 @@ public class ComputerCraft
         }
     }
 
+    public static InputStream getResourceFile( Class<?> modClass, String domain, String subPath )
+    {
+        // Start searching in possible locations
+        subPath = "assets/" + domain + "/" + subPath;
+
+        // Look in resource packs
+        File resourcePackDir = getResourcePackDir();
+        if( resourcePackDir.exists() && resourcePackDir.isDirectory() )
+        {
+            String[] resourcePacks = resourcePackDir.list();
+            for( String resourcePackPath : resourcePacks )
+            {
+                File resourcePack = new File( resourcePackDir, resourcePackPath );
+                if( resourcePack.isDirectory() )
+                {
+                    // Mount a resource pack from a folder
+                    File subResource = new File( resourcePack, subPath );
+                    if( subResource.exists() && subResource.isFile() )
+                    {
+                        try
+                        {
+                            return new FileInputStream( subResource );
+                        }
+                        catch( FileNotFoundException ignored )
+                        {
+                        }
+                    }
+                }
+                else
+                {
+                    ZipFile zipFile = null;
+                    try
+                    {
+                        final ZipFile zip = zipFile = new ZipFile( resourcePack );
+                        ZipEntry entry = zipFile.getEntry( subPath );
+                        if( entry != null )
+                        {
+                            // Return a custom InputStream which will close the original zip when finished.
+                            return new FilterInputStream( zipFile.getInputStream( entry ) )
+                            {
+                                @Override
+                                public void close() throws IOException
+                                {
+                                    super.close();
+                                    zip.close();
+                                }
+                            };
+                        }
+                        else
+                        {
+                            IOUtils.closeQuietly( zipFile );
+                        }
+                    }
+                    catch( IOException e )
+                    {
+                        if( zipFile != null ) IOUtils.closeQuietly( zipFile );
+                    }
+                }
+            }
+        }
+
+        // Look in debug dir
+        File codeDir = getDebugCodeDir( modClass );
+        if( codeDir != null )
+        {
+            File subResource = new File( codeDir, subPath );
+            if( subResource.exists() && subResource.isFile() )
+            {
+                try
+                {
+                    return new FileInputStream( subResource );
+                }
+                catch( FileNotFoundException ignored )
+                {
+                }
+            }
+        }
+
+        // Look in class loader
+        return modClass.getClassLoader().getResourceAsStream( subPath );
+    }
+
     private static File getContainingJar( Class<?> modClass )
     {
         String path = modClass.getProtectionDomain().getCodeSource().getLocation().getPath();
@@ -926,12 +1005,12 @@ public class ComputerCraft
         return turtleProxy.getTurtleUpgrade( legacyID );
     }
 
-    public static ITurtleUpgrade getTurtleUpgrade( ItemStack item )
+    public static ITurtleUpgrade getTurtleUpgrade( @Nonnull ItemStack item )
     {
         return turtleProxy.getTurtleUpgrade( item );
     }
 
-    public static void addAllUpgradedTurtles( List<ItemStack> list )
+    public static void addAllUpgradedTurtles( NonNullList<ItemStack> list )
     {
         turtleProxy.addAllUpgradedTurtles( list );
     }

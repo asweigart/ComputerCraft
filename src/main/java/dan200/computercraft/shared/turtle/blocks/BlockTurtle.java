@@ -13,6 +13,7 @@ import dan200.computercraft.shared.computer.core.ComputerFamily;
 import dan200.computercraft.shared.util.DirectionUtil;
 import net.minecraft.block.material.Material;
 import net.minecraft.block.properties.PropertyDirection;
+import net.minecraft.block.state.BlockFaceShape;
 import net.minecraft.block.state.BlockStateContainer;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.entity.EntityLivingBase;
@@ -73,6 +74,14 @@ public class BlockTurtle extends BlockComputerBase
     public boolean isFullCube( IBlockState state )
     {
         return false;
+    }
+
+    @Nonnull
+    @Override
+    @Deprecated
+    public BlockFaceShape getBlockFaceShape( IBlockAccess world, IBlockState state, BlockPos pos, EnumFacing side )
+    {
+        return BlockFaceShape.UNDEFINED;
     }
 
     @Nonnull
@@ -152,13 +161,13 @@ public class BlockTurtle extends BlockComputerBase
     }
 
     @Override
-    public void onBlockPlacedBy( World world, BlockPos pos, IBlockState state, EntityLivingBase player, ItemStack itemstack )
+    public void onBlockPlacedBy( World world, BlockPos pos, IBlockState state, EntityLivingBase player, @Nonnull ItemStack itemstack )
     {
         // Not sure why this is necessary
         TileEntity tile = world.getTileEntity( pos );
         if( tile != null && tile instanceof TileTurtle )
         {
-            tile.setWorldObj( world ); // Not sure why this is necessary
+            tile.setWorld( world ); // Not sure why this is necessary
             tile.setPos( pos ); // Not sure why this is necessary
         }
 

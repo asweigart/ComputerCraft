@@ -30,8 +30,8 @@ public class GuiDiskDrive extends GuiContainer
     protected void drawGuiContainerForegroundLayer(int par1, int par2)
     {
         String title = m_diskDrive.getDisplayName().getUnformattedText();
-        fontRendererObj.drawString( title, (xSize - fontRendererObj.getStringWidth(title)) / 2, 6, 0x404040 );
-        fontRendererObj.drawString( I18n.format("container.inventory"), 8, (ySize - 96) + 2, 0x404040 );
+        fontRenderer.drawString( title, (xSize - fontRenderer.getStringWidth(title)) / 2, 6, 0x404040 );
+        fontRenderer.drawString( I18n.format("container.inventory"), 8, (ySize - 96) + 2, 0x404040 );
     }
 
     @Override
@@ -42,5 +42,13 @@ public class GuiDiskDrive extends GuiContainer
         int l = (width - xSize) / 2;
         int i1 = (height - ySize) / 2;
         drawTexturedModalRect(l, i1, 0, 0, xSize, ySize);
+    }
+
+    @Override
+    public void drawScreen( int mouseX, int mouseY, float partialTicks)
+    {
+        drawDefaultBackground();
+        super.drawScreen(mouseX, mouseY, partialTicks);
+        renderHoveredToolTip(mouseX, mouseY);
     }
 }

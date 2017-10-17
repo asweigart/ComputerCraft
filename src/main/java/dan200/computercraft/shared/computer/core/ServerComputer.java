@@ -26,6 +26,8 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 import net.minecraftforge.fml.common.Loader;
 
+import java.io.InputStream;
+
 public class ServerComputer extends ServerTerminal
     implements IComputer, IComputerEnvironment, INetworkedThing
 {
@@ -310,6 +312,12 @@ public class ServerComputer extends ServerTerminal
     }
 
     @Override
+    public InputStream createResourceFile( String domain, String subPath )
+    {
+        return ComputerCraft.getResourceFile( ComputerCraft.class, domain, subPath );
+    }
+
+    @Override
     public long getComputerSpaceLimit()
     {
         return ComputerCraft.computerSpaceLimit;
@@ -329,6 +337,7 @@ public class ServerComputer extends ServerTerminal
 
     // Networking stuff
 
+    @Override
     public void writeDescription( NBTTagCompound nbttagcompound )
     {
         super.writeDescription( nbttagcompound );
